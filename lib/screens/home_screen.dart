@@ -46,7 +46,7 @@ class HomeScreen extends StatelessWidget {
                   Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => ConfigurationScreen()));
+                          builder: (context) => const ConfigurationScreen()));
                 },
                 child: const Text('Configurações')),
             const SizedBox(
