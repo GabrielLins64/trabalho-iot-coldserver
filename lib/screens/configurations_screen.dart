@@ -57,13 +57,13 @@ class _ConfigurationScreenState extends State<ConfigurationScreen> {
               ),
               const SizedBox(height: 20),
               _buildNumericalInput(
-                label: 'Temperatura de segurança máxima',
+                label: 'Temperatura crítica mínima',
                 defaultValue: maxSafeTemp,
                 dbFieldName: 'temperature_lower',
               ),
               const SizedBox(height: 20),
               _buildNumericalInput(
-                label: 'Temperatura crítica mínima',
+                label: 'Temperatura crítica máxima',
                 defaultValue: minCriticalTemp,
                 dbFieldName: 'temperature_upper',
               ),
