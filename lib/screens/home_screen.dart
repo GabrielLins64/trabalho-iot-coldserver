@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:grafico_iot/screens/chart_screen.dart';
 import 'package:grafico_iot/screens/configurations_screen.dart';
+import 'package:grafico_iot/screens/credits_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, required this.title});
@@ -53,7 +54,12 @@ class HomeScreen extends StatelessWidget {
               height: 10,
             ),
             ElevatedButton(
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const CreditsScreen()));
+              },
               child: const Text(
                 'Créditos',
               ),
