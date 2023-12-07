@@ -25,6 +25,7 @@ class _TemperatureChartState extends State<TemperatureChart> {
   late TooltipBehavior _tooltipBehavior;
   late List<TemperatureData> _data;
   late Timer _timer;
+  late StreamSubscription<List<Map<String, dynamic>>> stream;
   ChartSeriesController? _chartSeriesController;
   late bool _isMockData = false;
   late bool _hasActiveConnection = false;
@@ -48,15 +49,21 @@ class _TemperatureChartState extends State<TemperatureChart> {
         _timer =
             Timer.periodic(widget.dataFetchingPeriod, _updateMockDataSource);
       });
+    } else {
+      supabase = Supabase.instance.client;
+      _data = await _getInitialSupabaseData();
+      stream = supabase
+          .from('registered_temperatures')
+          .stream(primaryKey: ['id'])
+          .order('id', ascending: false)
+          .limit(1)
+          .listen((List<Map<String, dynamic>> data) {
+            _updateSupabaseDataSource(data.first);
+          });
+      setState(() {
+        _hasActiveConnection = true;
+      });
     }
-
-    supabase = Supabase.instance.client;
-    _data = await _getInitialSupabaseData();
-    return setState(() {
-      _hasActiveConnection = true;
-      _timer =
-          Timer.periodic(widget.dataFetchingPeriod, _updateSupabaseDataSource);
-    });
   }
 
   List<TemperatureData> _getInitialMockData() {
@@ -105,32 +112,27 @@ class _TemperatureChartState extends State<TemperatureChart> {
     }
   }
 
-  void _updateSupabaseDataSource(Timer timer) async {
-    if (_chartSeriesController == null) {
-      return;
-    }
+  void _updateSupabaseDataSource(Map<String, dynamic> data) async {
+    try {
+      if (_chartSeriesController == null) {
+        return;
+      }
 
-    dynamic res = await supabase
-        .from('registered_temperatures')
-        .select('created_at, temperature')
-        .order('id', ascending: false)
-        .limit(1)
-        .single();
+      final newDataPoint = TemperatureData(DateTime.parse(data['created_at']),
+          double.parse(data['temperature'].toString()));
+      _data.add(newDataPoint);
 
-    final newDataPoint = TemperatureData(DateTime.parse(res['created_at']),
-        double.parse(res['temperature'].toString()));
-    _data.add(newDataPoint);
-
-    if (_data.length >= widget.maxVisibleDataPoints) {
-      _data.removeAt(0);
-      _chartSeriesController!.updateDataSource(
+      if (_data.length > widget.maxVisibleDataPoints) {
+        _data.removeAt(0);
+        _chartSeriesController!.updateDataSource(
+            addedDataIndexes: <int>[_data.length - 1],
+            removedDataIndexes: <int>[0]);
+      } else {
+        _chartSeriesController!.updateDataSource(
           addedDataIndexes: <int>[_data.length - 1],
-          removedDataIndexes: <int>[0]);
-    } else {
-      _chartSeriesController!.updateDataSource(
-        addedDataIndexes: <int>[_data.length - 1],
-      );
-    }
+        );
+      }
+    } catch (e) {}
   }
 
   List<TemperatureData> getSupabaseData(AsyncSnapshot<Object?> snapshot) {
@@ -206,10 +208,13 @@ class _TemperatureChartState extends State<TemperatureChart> {
   @override
   void dispose() {
     super.dispose();
-    _timer.cancel();
-    if (_hasActiveConnection) {
-      supabase.dispose();
-    }
+    try {
+      _timer.cancel();
+      stream.cancel();
+      if (_hasActiveConnection) {
+        supabase.dispose();
+      }
+    } catch (e) {}
   }
 }
 
