@@ -157,7 +157,7 @@ class _TemperatureChartState extends State<TemperatureChart> {
         color: Colors.lightBlue,
         textStyle: const TextStyle(
             color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-        format: 'point.x (point.y ºC)');
+        format: 'point.x (point.y)');
   }
 
   @override
