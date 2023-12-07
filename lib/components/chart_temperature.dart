@@ -30,11 +30,13 @@ class _TemperatureChartState extends State<TemperatureChart> {
   late bool _isMockData = false;
   late bool _hasActiveConnection = false;
   late SupabaseClient supabase;
+  late ValueNotifier<double> _currentTemperature;
 
   @override
   void initState() {
     _initTooltipBehavior();
     _connectToDataSource();
+    _currentTemperature = ValueNotifier<double>(0.0);
     super.initState();
   }
 
@@ -120,7 +122,9 @@ class _TemperatureChartState extends State<TemperatureChart> {
 
       final newDataPoint = TemperatureData(DateTime.parse(data['created_at']),
           double.parse(data['temperature'].toString()));
+
       _data.add(newDataPoint);
+      _currentTemperature.value = newDataPoint.temperature;
 
       if (_data.length > widget.maxVisibleDataPoints) {
         _data.removeAt(0);
@@ -132,7 +136,7 @@ class _TemperatureChartState extends State<TemperatureChart> {
           addedDataIndexes: <int>[_data.length - 1],
         );
       }
-    } catch (e) {}
+    } catch (_) {}
   }
 
   List<TemperatureData> getSupabaseData(AsyncSnapshot<Object?> snapshot) {
@@ -164,7 +168,35 @@ class _TemperatureChartState extends State<TemperatureChart> {
   Widget build(BuildContext context) {
     return Center(
       child: (_isMockData || _hasActiveConnection)
-          ? renderSfCartesianChart(dataSource: _data, hasController: true)
+          ? (Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 20.0, bottom: 0),
+                  child: SizedBox(
+                    height: 40,
+                    child: ValueListenableBuilder<double>(
+                      valueListenable: _currentTemperature,
+                      builder: (context, currentTemp, child) {
+                        return _data.isEmpty
+                            ? const Text(
+                                'No data available',
+                                style: TextStyle(
+                                  fontSize: 23,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            : Text('Temperatura atual: $currentTemp ºC',
+                                style: const TextStyle(
+                                    fontSize: 20, fontWeight: FontWeight.bold));
+                      },
+                    ),
+                  ),
+                ),
+                Expanded(
+                    child: Container(
+                        child: renderSfCartesianChart(dataSource: _data))),
+              ],
+            ))
           : const Text(
               'Não foi possível conectar ao servidor.'
               '\nVerifique suas configurações de conexão.',
@@ -174,34 +206,29 @@ class _TemperatureChartState extends State<TemperatureChart> {
     );
   }
 
-  Padding renderSfCartesianChart(
-      {required List<TemperatureData> dataSource, bool hasController = false}) {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: SfCartesianChart(
-        tooltipBehavior: _tooltipBehavior,
-        primaryXAxis: DateTimeAxis(
-          desiredIntervals: 4,
-          dateFormat: DateFormat('H:m:s'),
-        ),
-        primaryYAxis: NumericAxis(
-          labelFormat: '{value} ºC',
-          desiredIntervals: 5,
-        ),
-        series: <LineSeries<TemperatureData, DateTime>>[
-          LineSeries(
-            onRendererCreated: hasController
-                ? (ChartSeriesController controller) {
-                    _chartSeriesController = controller;
-                  }
-                : null,
-            enableTooltip: true,
-            dataSource: dataSource,
-            xValueMapper: (TemperatureData tmpData, _) => tmpData.time,
-            yValueMapper: (TemperatureData tmpData, _) => tmpData.temperature,
-          ),
-        ],
+  SfCartesianChart renderSfCartesianChart(
+      {required List<TemperatureData> dataSource}) {
+    return SfCartesianChart(
+      tooltipBehavior: _tooltipBehavior,
+      primaryXAxis: DateTimeAxis(
+        desiredIntervals: 4,
+        dateFormat: DateFormat('H:m:s'),
       ),
+      primaryYAxis: NumericAxis(
+        labelFormat: '{value} ºC',
+        desiredIntervals: 5,
+      ),
+      series: <LineSeries<TemperatureData, DateTime>>[
+        LineSeries(
+          onRendererCreated: (ChartSeriesController controller) {
+            _chartSeriesController = controller;
+          },
+          enableTooltip: true,
+          dataSource: dataSource,
+          xValueMapper: (TemperatureData tmpData, _) => tmpData.time,
+          yValueMapper: (TemperatureData tmpData, _) => tmpData.temperature,
+        ),
+      ],
     );
   }
 
@@ -214,7 +241,7 @@ class _TemperatureChartState extends State<TemperatureChart> {
       if (_hasActiveConnection) {
         supabase.dispose();
       }
-    } catch (e) {}
+    } catch (_) {}
   }
 }
 
