@@ -25,11 +25,11 @@ class _TemperatureChartState extends State<TemperatureChart> {
   late TooltipBehavior _tooltipBehavior;
   late List<TemperatureData> _data;
   late Timer _timer;
+  late StreamSubscription<List<Map<String, dynamic>>> stream;
   ChartSeriesController? _chartSeriesController;
   late bool _isMockData = false;
   late bool _hasActiveConnection = false;
   late SupabaseClient supabase;
-  late dynamic _stream;
 
   @override
   void initState() {
@@ -49,18 +49,21 @@ class _TemperatureChartState extends State<TemperatureChart> {
         _timer =
             Timer.periodic(widget.dataFetchingPeriod, _updateMockDataSource);
       });
+    } else {
+      supabase = Supabase.instance.client;
+      _data = await _getInitialSupabaseData();
+      stream = supabase
+          .from('registered_temperatures')
+          .stream(primaryKey: ['id'])
+          .order('id', ascending: false)
+          .limit(1)
+          .listen((List<Map<String, dynamic>> data) {
+            _updateSupabaseDataSource(data.first);
+          });
+      setState(() {
+        _hasActiveConnection = true;
+      });
     }
-
-    supabase = Supabase.instance.client;
-    _stream = supabase
-        .from('registered_temperatures')
-        .stream(primaryKey: ['id'])
-        .order('id', ascending: false)
-        .limit(widget.maxVisibleDataPoints);
-    return setState(() {
-      _hasActiveConnection = true;
-      _timer = Timer(const Duration(seconds: 1), () {});
-    });
   }
 
   List<TemperatureData> _getInitialMockData() {
@@ -69,6 +72,22 @@ class _TemperatureChartState extends State<TemperatureChart> {
           DateTime.now().subtract(const Duration(seconds: 1)), 20.0),
       TemperatureData(DateTime.now(), 20.0),
     ];
+  }
+
+  Future<List<TemperatureData>> _getInitialSupabaseData() async {
+    dynamic res = await supabase
+        .from('registered_temperatures')
+        .select('created_at, temperature')
+        .order('id', ascending: false)
+        .limit(widget.maxVisibleDataPoints);
+
+    List<TemperatureData> data = [];
+    for (var dataPoint in res) {
+      data.add(TemperatureData(DateTime.parse(dataPoint['created_at']),
+          double.parse(dataPoint['temperature'].toString())));
+    }
+    data = data.take(data.length - 1).toList().reversed.toList();
+    return data;
   }
 
   void _updateMockDataSource(Timer timer) {
@@ -93,9 +112,32 @@ class _TemperatureChartState extends State<TemperatureChart> {
     }
   }
 
+  void _updateSupabaseDataSource(Map<String, dynamic> data) async {
+    try {
+      if (_chartSeriesController == null) {
+        return;
+      }
+
+      final newDataPoint = TemperatureData(DateTime.parse(data['created_at']),
+          double.parse(data['temperature'].toString()));
+      _data.add(newDataPoint);
+
+      if (_data.length > widget.maxVisibleDataPoints) {
+        _data.removeAt(0);
+        _chartSeriesController!.updateDataSource(
+            addedDataIndexes: <int>[_data.length - 1],
+            removedDataIndexes: <int>[0]);
+      } else {
+        _chartSeriesController!.updateDataSource(
+          addedDataIndexes: <int>[_data.length - 1],
+        );
+      }
+    } catch (e) {}
+  }
+
   List<TemperatureData> getSupabaseData(AsyncSnapshot<Object?> snapshot) {
     List<Map<String, dynamic>> supabaseData =
-    snapshot.data as List<Map<String, dynamic>>;
+        snapshot.data as List<Map<String, dynamic>>;
     List<TemperatureData> chartData = [];
 
     for (var dataPoint in supabaseData) {
@@ -115,31 +157,20 @@ class _TemperatureChartState extends State<TemperatureChart> {
         color: Colors.lightBlue,
         textStyle: const TextStyle(
             color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-        format: 'point.x (point.y ºC)');
+        format: 'point.x (point.y)');
   }
 
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: _isMockData
+      child: (_isMockData || _hasActiveConnection)
           ? renderSfCartesianChart(dataSource: _data, hasController: true)
-          : (_hasActiveConnection
-              ? StreamBuilder(
-                  stream: _stream,
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    List<TemperatureData> dataSource =
-                        getSupabaseData(snapshot);
-                    return renderSfCartesianChart(dataSource: dataSource);
-                  })
-              : const Text(
-                  'Não foi possível conectar ao servidor.'
-                  '\nVerifique suas configurações de conexão.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 17),
-                )),
+          : const Text(
+              'Não foi possível conectar ao servidor.'
+              '\nVerifique suas configurações de conexão.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 17),
+            ),
     );
   }
 
@@ -153,8 +184,10 @@ class _TemperatureChartState extends State<TemperatureChart> {
           desiredIntervals: 4,
           dateFormat: DateFormat('H:m:s'),
         ),
-        primaryYAxis:
-            NumericAxis(labelFormat: '{value} ºC', desiredIntervals: 5,),
+        primaryYAxis: NumericAxis(
+          labelFormat: '{value} ºC',
+          desiredIntervals: 5,
+        ),
         series: <LineSeries<TemperatureData, DateTime>>[
           LineSeries(
             onRendererCreated: hasController
@@ -172,16 +205,16 @@ class _TemperatureChartState extends State<TemperatureChart> {
     );
   }
 
-
   @override
   void dispose() {
     super.dispose();
-    if (_timer.isActive) {
+    try {
       _timer.cancel();
-    }
-    if (_hasActiveConnection) {
-      supabase.dispose();
-    }
+      stream.cancel();
+      if (_hasActiveConnection) {
+        supabase.dispose();
+      }
+    } catch (e) {}
   }
 }
 
