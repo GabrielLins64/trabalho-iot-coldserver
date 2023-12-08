@@ -15,7 +15,7 @@ class _ConfigurationScreenState extends State<ConfigurationScreen> {
   late SharedPreferences prefs;
   late int maxSafeTemp = 0;
   late int minCriticalTemp = 0;
-  late int currentACTemp = 0;
+  // late int currentACTemp = 0;
   late SupabaseClient supabase;
 
   @override
@@ -33,9 +33,9 @@ class _ConfigurationScreenState extends State<ConfigurationScreen> {
         .single();
 
     setState(() {
-      maxSafeTemp = data['temperature_lower'] ?? 0;
-      minCriticalTemp = data['temperature_upper'] ?? 5;
-      currentACTemp = data['temperature_air_conditioning'] ?? 0;
+      maxSafeTemp = data['temperature_upper'] ?? 5;
+      minCriticalTemp = data['temperature_lower'] ?? 0;
+      // currentACTemp = data['temperature_air_conditioning'] ?? 0;
     });
   }
 
@@ -58,21 +58,21 @@ class _ConfigurationScreenState extends State<ConfigurationScreen> {
               const SizedBox(height: 20),
               _buildNumericalInput(
                 label: 'Temperatura crítica mínima',
-                defaultValue: maxSafeTemp,
+                defaultValue: minCriticalTemp,
                 dbFieldName: 'temperature_lower',
               ),
               const SizedBox(height: 20),
               _buildNumericalInput(
                 label: 'Temperatura crítica máxima',
-                defaultValue: minCriticalTemp,
+                defaultValue: maxSafeTemp,
                 dbFieldName: 'temperature_upper',
               ),
-              const SizedBox(height: 20),
-              _buildNumericalInput(
-                label: 'Temperatura atual do ar condicionado',
-                defaultValue: currentACTemp,
-                dbFieldName: 'temperature_air_conditioning',
-              ),
+              // const SizedBox(height: 20),
+              // _buildNumericalInput(
+              //   label: 'Temperatura atual do ar condicionado',
+              //   defaultValue: currentACTemp,
+              //   dbFieldName: 'temperature_air_conditioning',
+              // ),
             ],
           ),
         ),
