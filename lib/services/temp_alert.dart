@@ -29,7 +29,7 @@ class TemperatureAlertService {
         .limit(1)
         .single();
     int ledStatus = res['led_status'];
-    if (ledStatus == 3) {
+    if (ledStatus == 1) {
       dynamic tempData = await supabase
           .from('registered_temperatures')
           .select('temperature')
